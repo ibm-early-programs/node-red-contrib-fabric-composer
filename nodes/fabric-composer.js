@@ -68,9 +68,7 @@ module.exports = function (RED) {
    * @return {Promise} A promise that is resolved when the connector has connected.
    */
   function ensureConnected (node) {
-    console.log('banana');
     node.log('ensureConnected');
-    console.log('cake');
     if (connected) {
       return Promise.resolve();
     } else if (connecting) {
@@ -91,7 +89,6 @@ module.exports = function (RED) {
   function create (data, node) {
     node.log('create', data);
 
-    console.log('bob');
     ensureConnected(node)
       .then(() => {
       node.log('connection');
@@ -162,9 +159,6 @@ module.exports = function (RED) {
       participantId = config.participantId;
       participantPassword = config.participantPassword;
 
-      console.log('CAROLINE', config);
-
-      console.log('about to create', msg.payload);
       create(msg.payload, node)
     });
   }
