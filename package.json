@@ -1,0 +1,15 @@
+{
+  "name"         : "node-red-contrib-fabriccomposer",
+  "version"      : "0.0.1",
+  "description"  : "A fabric composer node for node-red",
+  "dependencies": {
+    "composer-common" : "latest",
+    "composer-client" : "latest"
+  },
+  "keywords": [ "node-red" ],
+  "node-red"     : {
+    "nodes": {
+      "fabric-composer": "nodes/fabric-composer.js"
+    }
+  }
+}
