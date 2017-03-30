@@ -30,7 +30,11 @@ module.exports = function (RED) {
   let connectionProfileName, businessNetworkIdentifier, participantId, participantPassword;
   let businessNetworkDefinition, serializer, modelManager, introspector;
 
-    /**
+  const UPDATE = 'update';
+  const RETRIEVE = 'retrieve';
+  const CREATE = 'create';
+
+  /**
    * Connect to the Business Network
    * @return {Promise} A promise that is resolved when the connector has connected.
    */
@@ -82,16 +86,13 @@ module.exports = function (RED) {
    * Create an instance of an object in Composer. For assets, this method
    * adds the asset to the default asset registry. For transactions, this method
    * submits the transaction for execution.
-   * @param {string} lbModelName the fully qualified model name.
-   * @param {Object} data the data for the asset or transaction.
-   * @param {function} callback the callback to call when complete.
    */
   function create (data, node) {
     node.log('create', data);
 
-    ensureConnected(node)
+    return ensureConnected(node)
       .then(() => {
-      node.log('connection');
+        node.log('connected');
         // Convert the JSON data into a resource.
         let serializer = businessNetworkDefinition.getSerializer();
         let resource = serializer.fromJSON(data);
@@ -101,13 +102,13 @@ module.exports = function (RED) {
         if (classDeclaration instanceof AssetDeclaration) {
           node.log('creating asset', data);
           // For assets, we add the asset to its default asset registry
-          businessNetworkConnection.getAssetRegistry(classDeclaration.getFullyQualifiedName())
+          return businessNetworkConnection.getAssetRegistry(classDeclaration.getFullyQualifiedName())
             .then((assetRegistry) => {
-            node.log('Got asset registry');
+              node.log('Got asset registry');
               return assetRegistry.add(resource);
             })
             .then(() => {
-            node.log('added resource');
+              node.log('added resource');
               node.status({});
             })
             .catch((error) => {
@@ -117,7 +118,7 @@ module.exports = function (RED) {
         } else if (classDeclaration instanceof TransactionDeclaration) {
           node.log('creating transaction');
           // For transactions, we submit the transaction for execution.
-          businessNetworkConnection.submitTransaction(resource)
+          return businessNetworkConnection.submitTransaction(resource)
             .then(() => {
               node.status({});
             })
@@ -127,7 +128,7 @@ module.exports = function (RED) {
 
         } else if (classDeclaration instanceof ParticipantDeclaration) {
           node.log('creating participant');
-          businessNetworkConnection.getParticipantRegistry(classDeclaration.getFullyQualifiedName())
+          return businessNetworkConnection.getParticipantRegistry(classDeclaration.getFullyQualifiedName())
             .then((participantRegistry) => {
               node.log('got registry', participantRegistry);
               return participantRegistry.add(resource);
@@ -149,21 +150,216 @@ module.exports = function (RED) {
       });
   }
 
+  /**
+   * Get an instance of an object in Composer. For assets, this method
+   * gets the asset from the default asset registry.
+   */
+  function retrieve (data, node) {
+    node.log('retrieve');
+
+    let modelName = data.modelName;
+    let id = data.id;
+
+    return ensureConnected(node)
+      .then(() => {
+        node.log('connected');
+        let modelManager = businessNetworkDefinition.getModelManager();
+        let classDeclaration = modelManager.getType(modelName);
+
+        if (classDeclaration instanceof AssetDeclaration) {
+          // For assets, we add the asset to its default asset registry.
+          return businessNetworkConnection.getAssetRegistry(modelName)
+            .then((assetRegistry) => {
+              node.log('got asset registry');
+              return assetRegistry.get(id);
+            })
+            .then((result) => {
+              node.log('got asset');
+              return serializer.toJSON(result);
+            })
+            .catch((error) => {
+              throw error;
+            });
+        } else if (classDeclaration instanceof ParticipantDeclaration) {
+          // For participants, we add the participant to its default participant registry.
+          return businessNetworkConnection.getParticipantRegistry(modelName)
+            .then((participantRegistry) => {
+              node.log('got participant registry');
+              return participantRegistry.get(id);
+            })
+            .then((result) => {
+              node.log('got participant');
+              return serializer.toJSON(result);
+            })
+            .catch((error) => {
+              throw(error);
+            });
+        } else {
+          // For everything else, we blow up!
+          throw new Error(`Unable to handle resource of type: ${typeof classDeclaration}`);
+        }
+      })
+      .catch((error) => {
+        throw new Error('retrieve: error thrown doing retrieve ' + error.message);
+      });
+  }
+
+  /**
+   * Update an instance of an object in Composer. For assets, this method
+   * updates the asset to the default asset registry.
+   */
+  function update (data, node) {
+    node.log('update');
+
+    return ensureConnected(node)
+      .then(() => {
+        node.log('connected');
+        // Convert the JSON data into a resource.
+        let serializer = businessNetworkDefinition.getSerializer();
+        let resource = serializer.fromJSON(data);
+
+        // The create action is based on the type of the resource.
+        let classDeclaration = resource.getClassDeclaration();
+        if (classDeclaration instanceof AssetDeclaration) {
+          // For assets, we add the asset to its default asset registry.
+          return businessNetworkConnection.getAssetRegistry(classDeclaration.getFullyQualifiedName())
+            .then((assetRegistry) => {
+              return assetRegistry.update(resource);
+            })
+            .then(() => {
+              node.log('updated');
+              node.status({});
+            })
+            .catch((error) => {
+              throw(error);
+            });
+        } else if (classDeclaration instanceof ParticipantDeclaration) {
+          // For participants, we add the participant to its default participant registry.
+          return businessNetworkConnection.getParticipantRegistry(classDeclaration.getFullyQualifiedName())
+            .then((participantRegistry) => {
+              node.log('got participant registry');
+              return participantRegistry.update(resource);
+            })
+            .then(() => {
+              node.log('updated');
+              node.status({});
+            })
+            .catch((error) => {
+              throw(error);
+            });
+        } else {
+          // For everything else, we blow up!
+          throw new Error(`Unable to handle resource of type: ${typeof classDeclaration}`);
+        }
+      })
+      .catch((error) => {
+        node.status({fill : 'red', shape : 'dot', text : 'Error updating resource'});
+        node.error('update: error thrown doing update ' + error.message);
+      });
+  }
+
+  function checkConfig (config) {
+    return Promise.resolve().then(() => {
+
+      if (!config.connectionProfile) {
+        throw new Error('connection profile must be set');
+      } else if (!config.businessNetworkIdentifier) {
+        throw new Error('business network identifier must be set');
+      } else if (!config.participantId) {
+        throw new Error('participant id must be set');
+      } else if (!config.participantPassword) {
+        throw new Error('participant password must be set');
+      }
+
+      return '';
+    })
+  }
+
+  function checkPayLoad (payLoad, type) {
+    return Promise.resolve().then(() => {
+      if (type === RETRIEVE) {
+        if (!payLoad.modelName) {
+          throw new Error('modelName not set in payload');
+        } else if (!payLoad.id) {
+          throw new Error('id not set in payload');
+        }
+      } else if (type === UPDATE || type === CREATE) {
+        if (!payLoad.$class) {
+          throw new Error('$class not set in payload');
+        }
+      }
+
+      return '';
+    })
+  }
+
   function FabricComposerOutNode (config) {
     var node = this;
     RED.nodes.createNode(node, config);
 
     node.on('input', function (msg) {
-      connectionProfileName = config.connectionProfile;
-      businessNetworkIdentifier = config.businessNetworkIdentifier;
-      participantId = config.participantId;
-      participantPassword = config.participantPassword;
 
-      create(msg.payload, node)
+      checkConfig(config)
+        .then(() => {
+          connectionProfileName = config.connectionProfile;
+          businessNetworkIdentifier = config.businessNetworkIdentifier;
+          participantId = config.participantId;
+          participantPassword = config.participantPassword;
+
+          node.log('checking payload');
+          return checkPayLoad(msg.payload, config.actionType);
+        })
+        .then(() => {
+          if (config.actionType == 'create') {
+            return create(msg.payload, node)
+          } else {
+            return update(msg.payload, node);
+          }
+        })
+        .catch((error) => {
+          node.status({fill : 'red', shape : 'dot', text : 'Error with inputs'});
+          node.error(error.message);
+        });
     });
   }
 
   RED.nodes.registerType('fabric-composer-out', FabricComposerOutNode);
+
+  function FabricComposerMidNode (config) {
+    var node = this;
+    RED.nodes.createNode(node, config);
+
+    node.on('input', function (msg) {
+
+        checkConfig(config)
+          .then(() => {
+            connectionProfileName = config.connectionProfile;
+            businessNetworkIdentifier = config.businessNetworkIdentifier;
+            participantId = config.participantId;
+            participantPassword = config.participantPassword;
+
+            return checkPayLoad(msg.payload, RETRIEVE);
+
+          })
+          .then(() => {
+            node.status('retrieving resource');
+            return retrieve(msg.payload, node);
+          })
+          .then((result) => {
+            node.log('got a result');
+            msg.payload = result;
+            node.status({});
+            node.send(msg);
+          })
+          .catch((error) => {
+            node.status({fill : 'red', shape : 'dot', text : 'Error'});
+            node.error(error.message);
+          });
+      }
+    );
+  }
+
+  RED.nodes.registerType('fabric-composer-mid', FabricComposerMidNode);
 };
 
 
