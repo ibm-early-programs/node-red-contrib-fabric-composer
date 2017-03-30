@@ -19,6 +19,10 @@
         <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="node-red:common.label.name"></span></label>
         <input type="text" id="node-input-name" data-i18n="[placeholder]node-red:common.label.name">
     </div>
+     <select id="node-input-actionType">
+            <option value="create">Create</option>
+            <option value="update">Update</option>
+        </select>
      <div class="form-row">
         <label for="node-input-connectionProfile"><i class="fa fa-tag"></i> Connection Profile</label>
         <input type="text" id="node-input-connectionProfile">
@@ -28,7 +32,7 @@
         <input type="text" id="node-input-businessNetworkIdentifier">
     </div>
      <div class="form-row">
-        <label for="node-input-participantId"><i class="fa fa-tag"></i> Participant Idr</label>
+        <label for="node-input-participantId"><i class="fa fa-tag"></i> Participant Id</label>
         <input type="text" id="node-input-participantId">
     </div>
     <div class="form-row">
@@ -36,27 +40,79 @@
         <input type="password" id="node-input-participantPassword">
     </div>
 
+
+
+</script>
+
+<script type="text/x-red" data-template-name="fabric-composer-mid">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="node-red:common.label.name"></span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]node-red:common.label.name">
+    </div>
+     <div class="form-row">
+        <label for="node-input-connectionProfile"><i class="fa fa-tag"></i> Connection Profile</label>
+        <input type="text" id="node-input-connectionProfile">
+    </div>
+    <div class="form-row">
+        <label for="node-input-businessNetworkIdentifier"><i class="fa fa-tag"></i> Business Network Identifier</label>
+        <input type="text" id="node-input-businessNetworkIdentifier">
+    </div>
+     <div class="form-row">
+        <label for="node-input-participantId"><i class="fa fa-tag"></i> Participant Id</label>
+        <input type="text" id="node-input-participantId">
+    </div>
+    <div class="form-row">
+        <label for="node-input-participantPassword"><i class="fa fa-tag"></i> Participant Password</label>
+        <input type="password" id="node-input-participantPassword">
+    </div>
+
+
+
 </script>
 
 <script type="text/x-red" data-help-name="fabric-composer-out">
-    <p>Fabric-Composer out node. Creates an asset, or participant or submits a transaction using the <code>msg.payload</code>.</p>
+  <p>Fabric-Composer node. Can either creates an asset, participant or submits a transaction or it can update an asset of participant</p>
+    <p>The data should be set in the <code>msg.payload</code><p>
     <p>The name of the resource or transaction should be set in msg.payload.$class</p>
+
+
 </script>
-
-<style type="text/css">
-    .node_label_white {
-        fill: white;
-    }
-
-    #palette_node_json-2-csv > div.palette_label {
-        color: white;
-    }
-</style>
 
 <script type="text/javascript">
   RED.nodes.registerType('fabric-composer-out', {
-    category : 'output',
+    category : 'Fabric-Composer',
     color : "#E6E0F8",
+    paletteLabel : "Fabric Composer",
+    defaults : {
+      name : {value : ""},
+      connectionProfile : {value : ""},
+      businessNetworkIdentifier : {value : ""},
+      participantId : {value : ""},
+      participantPassword : {value : ""},
+      actionType : {value : "create"}
+    },
+    inputs : 1,
+    outputs : 0,
+    icon : "CongaBlocks.png",
+    align : "right",
+    label : function () {
+      return this.name || "Fabric Composer";
+    }
+  });
+</script>
+
+<script type="text/x-red" data-help-name="fabric-composer-mid">
+<p>Fabric-Composer node. Gets an asset, or participant using the <code>msg.payload</code>.</p>
+    <p>The name of the resource or transaction should be set in msg.payload.modelName</p>
+    <p>The id of the resource should be set in msg.payload.id</p>
+
+</script>
+
+<script type="text/javascript">
+  RED.nodes.registerType('fabric-composer-mid', {
+    category : 'Fabric-Composer',
+    color : "#E6E0F8",
+    paletteLabel : "Fabric Composer",
     defaults : {
       name : {value : ""},
       connectionProfile : {value : ""},
@@ -65,11 +121,11 @@
       participantPassword : {value : ""}
     },
     inputs : 1,
-    outputs : 0,
+    outputs : 1,
     icon : "CongaBlocks.png",
-    align : "right",
     label : function () {
-      return this.name;
+      return this.name || "Fabric Composer";
     }
   });
 </script>
+
